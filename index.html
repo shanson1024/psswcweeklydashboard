@@ -1,1 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weekly Sales Dashboard – Precise & WorkComp 360</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-6">
+  <div class="max-w-6xl mx-auto" id="app"></div>
 
+  <script>
+    // ── Data ──
+    const weeklyData = [
+      { week: 'WE 1/4', weekFull: 'Week Ending 1/4/2026', precise: 718398.39, workcomp: 75632.57 },
+      { week: 'WE 1/11', weekFull: 'Week Ending 1/11/2026', precise: 990107.32, workcomp: 109706.82 },
+      { week: 'WE 1/18', weekFull: 'Week Ending 1/18/2026', precise: 993466.60, workcomp: 114999.86 },
+      { week: 'WE 1/25', weekFull: 'Week Ending 1/25/2026', precise: 945671.42, workcomp: 119048.54 },
+      { week: 'WE 2/1', weekFull: 'Week Ending 2/1/2026', precise: 982055.71, workcomp: 118943.00 },
+      { week: 'WE 2/8', weekFull: 'Week Ending 2/8/2026', precise: 986493.32, workcomp: 119903.14 },
+      { week: 'WE 2/15', weekFull: 'Week Ending 2/15/2026', precise: 994348.08, workcomp: 118520.27 },
+    ];
+
+    const workcompTotal = weeklyData.reduce((s, w) => s + w.workcomp, 0);
+    const preciseTotal = weeklyData.reduce((s, w) => s + w.precise, 0);
+    const grandTotal = preciseTotal + workcompTotal;
+    const current = weeklyData[weeklyData.length - 1];
+    const previous = weeklyData[weeklyData.length - 2];
+    const preciseGrowth = ((current.precise - previous.precise) / previous.precise * 100).toFixed(1);
+    const workcompGrowth = ((current.workcomp - previous.workcomp) / previous.workcomp * 100).toFixed(1);
+
+    const fmt = v => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtK = v => '$' + (v / 1000).toFixed(0) + 'k';
+
+    function trendArrow(val) {
+      const n = parseFloat(val);
+      const color = n >= 0 ? 'text-green-600' : 'text-red-600';
+      const arrow = n >= 0 ? '&#x2191;' : '&#x2193;';
+      return '<span class="' + color + ' text-sm font-medium">' + arrow + ' ' + Math.abs(n) + '%</span>';
+    }
+
+    function metricCard(title, value, color, trend, subtitle) {
+      return '<div class="bg-white rounded-lg p-5 shadow-sm border border-gray-100">' +
+        '<p class="text-sm text-gray-500 font-medium">' + title + '</p>' +
+        '<p class="text-2xl font-bold mt-1 ' + color + '">' + value + '</p>' +
+        '<div class="flex items-center mt-2">' +
+        (trend !== undefined ? trendArrow(trend) : '') +
+        (subtitle ? '<span class="text-sm text-gray-400 ml-2">' + subtitle + '</span>' : '') +
+        '</div></div>';
+    }
+
+    // ── Build HTML ──
+    var html = '';
+
+    // Header
+    html += '<div class="flex justify-between items-start mb-8">' +
+      '<div><h1 class="text-2xl font-bold text-gray-900">Weekly Sales Dashboard</h1>' +
+      '<p class="text-gray-500 mt-1">Precise &amp; WorkComp 360</p></div>' +
+      '<div class="text-right text-sm text-gray-400"><p>Data through: Week Ending 2/15/2026</p></div></div>';
+
+    // Metric Cards
+    html += '<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">';
+    html += metricCard('Precise (Latest)', fmt(current.precise), 'text-blue-600', preciseGrowth, 'vs prior week');
+    html += metricCard('Precise (7 Weeks)', fmt(preciseTotal), 'text-blue-600', undefined, 'avg ' + fmtK(preciseTotal / 7) + '/wk');
+    html += metricCard('WorkComp 360 (Latest)', fmt(current.workcomp), 'text-emerald-600', workcompGrowth, 'vs prior week');
+    html += metricCard('WorkComp 360 (7 Weeks)', fmt(workcompTotal), 'text-emerald-600', undefined, 'avg ' + fmtK(workcompTotal / 7) + '/wk');
+    html += '</div>';
+
+    // Combined Total Banner
+    html += '<div class="bg-gradient-to-r from-blue-600 to-emerald-600 rounded-lg p-6 mb-8 text-white">' +
+      '<div class="grid grid-cols-3 gap-4">' +
+      '<div><p class="text-blue-100 text-sm font-medium">Precise Total</p><p class="text-2xl font-bold mt-1">' + fmt(preciseTotal) + '</p></div>' +
+      '<div class="text-center"><p class="text-white/80 text-sm font-medium">Combined Total (7 Weeks)</p><p class="text-3xl font-bold mt-1">' + fmt(grandTotal) + '</p></div>' +
+      '<div class="text-right"><p class="text-emerald-100 text-sm font-medium">WorkComp 360 Total</p><p class="text-2xl font-bold mt-1">' + fmt(workcompTotal) + '</p></div>' +
+      '</div></div>';
+
+    // View Toggle + Chart
+    html += '<div class="flex gap-2 mb-6">' +
+      '<button onclick="setView(\'both\')" id="btn-both" class="px-4 py-2 rounded-lg text-sm font-medium bg-gray-900 text-white">Both Products</button>' +
+      '<button onclick="setView(\'precise\')" id="btn-precise" class="px-4 py-2 rounded-lg text-sm font-medium bg-white text-gray-600 hover:bg-gray-100 border border-gray-200">Precise Only</button>' +
+      '<button onclick="setView(\'workcomp\')" id="btn-workcomp" class="px-4 py-2 rounded-lg text-sm font-medium bg-white text-gray-600 hover:bg-gray-100 border border-gray-200">WorkComp 360 Only</button>' +
+      '</div>' +
+      '<div class="bg-white rounded-lg p-6 shadow-sm border border-gray-100 mb-6">' +
+      '<h2 class="text-lg font-semibold text-gray-900 mb-4">Weekly Revenue Comparison</h2>' +
+      '<canvas id="revenueChart" height="130"></canvas></div>';
+
+    // Data Table
+    var tableRows = '';
+    weeklyData.forEach(function(r) {
+      tableRows += '<tr class="border-b border-gray-100 hover:bg-gray-50">' +
+        '<td class="py-3 px-2 font-medium">' + r.weekFull + '</td>' +
+        '<td class="py-3 px-2 text-right">' + fmt(r.precise) + '</td>' +
+        '<td class="py-3 px-2 text-right">' + fmt(r.workcomp) + '</td>' +
+        '<td class="py-3 px-2 text-right font-medium">' + fmt(r.precise + r.workcomp) + '</td></tr>';
+    });
+    html += '<div class="bg-white rounded-lg p-6 shadow-sm border border-gray-100">' +
+      '<h2 class="text-lg font-semibold text-gray-900 mb-4">Weekly Breakdown</h2>' +
+      '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200">' +
+      '<th class="text-left py-3 px-2 font-medium text-gray-500">Week Ending</th>' +
+      '<th class="text-right py-3 px-2 font-medium text-blue-600">Precise</th>' +
+      '<th class="text-right py-3 px-2 font-medium text-emerald-600">WorkComp 360</th>' +
+      '<th class="text-right py-3 px-2 font-medium text-gray-900">Total</th>' +
+      '</tr></thead><tbody>' + tableRows +
+      '<tr class="bg-gray-50 font-semibold">' +
+      '<td class="py-3 px-2">Total (7 Weeks)</td>' +
+      '<td class="py-3 px-2 text-right text-blue-600">' + fmt(preciseTotal) + '</td>' +
+      '<td class="py-3 px-2 text-right text-emerald-600">' + fmt(workcompTotal) + '</td>' +
+      '<td class="py-3 px-2 text-right">' + fmt(grandTotal) + '</td>' +
+      '</tr></tbody></table></div></div>';
+
+    // Product Mix
+    html += '<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">' +
+      '<div class="bg-white rounded-lg p-6 shadow-sm border border-gray-100">' +
+      '<h2 class="text-lg font-semibold text-gray-900 mb-4">Precise — Revenue Mix</h2>' +
+      '<div class="space-y-3">' +
+      '<div class="flex justify-between items-center"><span class="text-gray-600">Share of Total</span><span class="font-bold text-blue-600">' + ((preciseTotal / grandTotal) * 100).toFixed(1) + '%</span></div>' +
+      '<div class="w-full bg-gray-200 rounded-full h-3"><div class="bg-blue-600 h-3 rounded-full" style="width:' + ((preciseTotal / grandTotal) * 100) + '%"></div></div>' +
+      '<div class="pt-3 border-t border-gray-100 mt-4 space-y-2">' +
+      '<div class="flex justify-between text-sm"><span class="text-gray-500">7-Week Total</span><span class="font-medium">' + fmt(preciseTotal) + '</span></div>' +
+      '<div class="flex justify-between text-sm"><span class="text-gray-500">Avg Weekly</span><span class="font-medium">' + fmt(preciseTotal / 7) + '</span></div>' +
+      '<div class="flex justify-between text-sm"><span class="text-gray-500">WoW Change</span>' + trendArrow(preciseGrowth) + '</div>' +
+      '</div></div></div>' +
+      '<div class="bg-white rounded-lg p-6 shadow-sm border border-gray-100">' +
+      '<h2 class="text-lg font-semibold text-gray-900 mb-4">WorkComp 360 — Revenue Mix</h2>' +
+      '<div class="space-y-3">' +
+      '<div class="flex justify-between items-center"><span class="text-gray-600">Share of Total</span><span class="font-bold text-emerald-600">' + ((workcompTotal / grandTotal) * 100).toFixed(1) + '%</span></div>' +
+      '<div class="w-full bg-gray-200 rounded-full h-3"><div class="bg-emerald-600 h-3 rounded-full" style="width:' + ((workcompTotal / grandTotal) * 100) + '%"></div></div>' +
+      '<div class="pt-3 border-t border-gray-100 mt-4 space-y-2">' +
+      '<div class="flex justify-between text-sm"><span class="text-gray-500">7-Week Total</span><span class="font-medium">' + fmt(workcompTotal) + '</span></div>' +
+      '<div class="flex justify-between text-sm"><span class="text-gray-500">Avg Weekly</span><span class="font-medium">' + fmt(workcompTotal / 7) + '</span></div>' +
+      '<div class="flex justify-between text-sm"><span class="text-gray-500">WoW Change</span>' + trendArrow(workcompGrowth) + '</div>' +
+      '</div></div></div></div>';
+
+    // Weekly Goal Tracker
+    var goalRows = '';
+    weeklyData.forEach(function(w) {
+      var t = w.precise + w.workcomp;
+      var v = t - 1400000;
+      var pct = (t / 1400000) * 100;
+      var pos = v >= 0;
+      goalRows += '<div class="border-b border-gray-100 pb-4">' +
+        '<div class="flex justify-between items-center mb-2">' +
+        '<span class="font-medium text-gray-900">' + w.weekFull + '</span>' +
+        '<span class="font-bold ' + (pos ? 'text-green-600' : 'text-red-600') + '">' + (pos ? '+' : '') + fmt(v) + '</span></div>' +
+        '<div class="flex items-center gap-3">' +
+        '<div class="flex-1 bg-gray-200 rounded-full h-2"><div class="h-2 rounded-full ' + (pos ? 'bg-green-500' : 'bg-amber-500') + '" style="width:' + Math.min(pct, 100) + '%"></div></div>' +
+        '<span class="text-sm text-gray-500 w-20 text-right">' + pct.toFixed(1) + '%</span></div>' +
+        '<div class="flex justify-between text-sm text-gray-500 mt-1">' +
+        '<span>Actual: ' + fmt(t) + '</span>' +
+        '<span>' + (pos ? 'Over goal' : fmt(Math.abs(v)) + ' to go') + '</span></div></div>';
+    });
+
+    var avgWeekly = grandTotal / 7;
+    var avgVar = avgWeekly - 1400000;
+    html += '<div class="bg-white rounded-lg p-6 shadow-sm border border-gray-100 mt-6">' +
+      '<h2 class="text-lg font-semibold text-gray-900 mb-4">Weekly Goal Tracker</h2>' +
+      '<div class="mb-4"><div class="flex justify-between items-center mb-2">' +
+      '<span class="text-gray-600">Weekly Goal (Combined)</span>' +
+      '<span class="font-bold text-gray-900">' + fmt(1400000) + '</span></div></div>' +
+      '<div class="space-y-4">' + goalRows + '</div>' +
+      '<div class="mt-4 pt-4 border-t border-gray-200"><div class="flex justify-between items-center">' +
+      '<span class="font-medium text-gray-900">7-Week Average</span>' +
+      '<div class="text-right"><span class="font-bold text-gray-900">' + fmt(avgWeekly) + '</span>' +
+      '<span class="ml-2 text-sm font-medium ' + (avgVar >= 0 ? 'text-green-600' : 'text-red-600') + '">(' + (avgVar >= 0 ? '+' : '') + fmt(avgVar) + ')</span></div>' +
+      '</div></div></div>';
+
+    // Annual Goal Projection
+    var ytdGoal = 1400000 * weeklyData.length;
+    var projRows = '';
+    var periods = [
+      { period: 'Feb 2026 &ndash; Jan 2027', year: 0 },
+      { period: 'Feb 2027 &ndash; Jan 2028', year: 1 },
+      { period: 'Feb 2028 &ndash; Jan 2029', year: 2 },
+      { period: 'Feb 2029 &ndash; Jan 2030', year: 3 },
+      { period: 'Feb 2030 &ndash; Jan 2031', year: 4 },
+    ];
+    periods.forEach(function(r) {
+      var wg = 1400000 * Math.pow(1.15, r.year);
+      var mg = wg * 4.33;
+      var ag = wg * 52;
+      var isCur = r.year === 0;
+      projRows += '<tr class="border-b border-gray-100 ' + (isCur ? 'bg-blue-50' : 'hover:bg-gray-50') + '">' +
+        '<td class="py-3 px-2 font-medium">' + r.period + (isCur ? ' <span class="ml-2 text-xs text-blue-600 font-semibold">CURRENT</span>' : '') + '</td>' +
+        '<td class="py-3 px-2 text-right">' + fmt(wg) + '</td>' +
+        '<td class="py-3 px-2 text-right">' + fmt(mg) + '</td>' +
+        '<td class="py-3 px-2 text-right font-medium">' + fmt(ag) + '</td>' +
+        '<td class="py-3 px-2 text-right">' + (isCur ? '<span class="font-medium">' + fmt(grandTotal) + '</span><span class="ml-1 text-xs ' + (grandTotal >= ytdGoal ? 'text-green-600' : 'text-red-600') + '">(' + ((grandTotal / ytdGoal) * 100).toFixed(1) + '%)</span>' : '<span class="text-gray-400">&mdash;</span>') + '</td></tr>';
+    });
+
+    html += '<div class="bg-white rounded-lg p-6 shadow-sm border border-gray-100 mt-6">' +
+      '<h2 class="text-lg font-semibold text-gray-900 mb-2">Annual Goal Projection</h2>' +
+      '<p class="text-sm text-gray-500 mb-4">15% annual increase starting February 2026</p>' +
+      '<div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">' +
+      '<div class="flex justify-between items-center mb-3">' +
+      '<span class="font-semibold text-blue-900">Current Year Progress (Feb 2026 &ndash; Jan 2027)</span>' +
+      '<span class="text-sm text-blue-600">' + weeklyData.length + ' weeks completed</span></div>' +
+      '<div class="grid grid-cols-2 md:grid-cols-4 gap-4">' +
+      '<div><p class="text-xs text-blue-600 uppercase tracking-wide">YTD Actual</p><p class="text-lg font-bold text-blue-900">' + fmt(grandTotal) + '</p></div>' +
+      '<div><p class="text-xs text-blue-600 uppercase tracking-wide">YTD Goal (' + weeklyData.length + ' wks)</p><p class="text-lg font-bold text-blue-900">' + fmt(ytdGoal) + '</p></div>' +
+      '<div><p class="text-xs text-blue-600 uppercase tracking-wide">Variance</p><p class="text-lg font-bold ' + (grandTotal >= ytdGoal ? 'text-green-600' : 'text-red-600') + '">' + (grandTotal >= ytdGoal ? '+' : '') + fmt(grandTotal - ytdGoal) + '</p></div>' +
+      '<div><p class="text-xs text-blue-600 uppercase tracking-wide">% of YTD Goal</p><p class="text-lg font-bold ' + (grandTotal >= ytdGoal ? 'text-green-600' : 'text-amber-600') + '">' + ((grandTotal / ytdGoal) * 100).toFixed(1) + '%</p></div>' +
+      '</div>' +
+      '<div class="mt-3"><div class="flex justify-between text-xs text-blue-600 mb-1">' +
+      '<span>Progress to Annual Goal</span>' +
+      '<span>' + ((grandTotal / (1400000 * 52)) * 100).toFixed(2) + '% of ' + fmt(1400000 * 52) + '</span></div>' +
+      '<div class="w-full bg-blue-200 rounded-full h-2"><div class="bg-blue-600 h-2 rounded-full" style="width:' + ((grandTotal / (1400000 * 52)) * 100) + '%"></div></div></div></div>' +
+      '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="border-b border-gray-200">' +
+      '<th class="text-left py-3 px-2 font-medium text-gray-500">Period</th>' +
+      '<th class="text-right py-3 px-2 font-medium text-gray-500">Weekly Goal</th>' +
+      '<th class="text-right py-3 px-2 font-medium text-gray-500">Monthly Goal</th>' +
+      '<th class="text-right py-3 px-2 font-medium text-gray-500">Annual Goal</th>' +
+      '<th class="text-right py-3 px-2 font-medium text-gray-500">YTD Actual</th>' +
+      '</tr></thead><tbody>' + projRows + '</tbody></table></div>' +
+      '<div class="mt-4 pt-4 border-t border-gray-100"><div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">' +
+      '<div><p class="text-xs text-gray-500 uppercase tracking-wide">Year 1 Annual</p><p class="text-lg font-bold text-gray-900">' + fmt(1400000 * 52) + '</p></div>' +
+      '<div><p class="text-xs text-gray-500 uppercase tracking-wide">Year 3 Annual</p><p class="text-lg font-bold text-gray-900">' + fmt(1400000 * Math.pow(1.15, 2) * 52) + '</p></div>' +
+      '<div><p class="text-xs text-gray-500 uppercase tracking-wide">Year 5 Annual</p><p class="text-lg font-bold text-gray-900">' + fmt(1400000 * Math.pow(1.15, 4) * 52) + '</p></div>' +
+      '<div><p class="text-xs text-gray-500 uppercase tracking-wide">5-Year Growth</p><p class="text-lg font-bold text-emerald-600">+74.9%</p></div>' +
+      '</div></div></div>';
+
+    document.getElementById('app').innerHTML = html;
+
+    // ── Chart.js Bar Chart ──
+    var revenueChart;
+    function buildChart(view) {
+      var ctx = document.getElementById('revenueChart').getContext('2d');
+      if (revenueChart) revenueChart.destroy();
+      var datasets = [];
+      if (view !== 'workcomp') {
+        datasets.push({
+          label: 'Precise',
+          data: weeklyData.map(function(w) { return w.precise; }),
+          backgroundColor: '#2563eb',
+          borderRadius: 4,
+        });
+      }
+      if (view !== 'precise') {
+        datasets.push({
+          label: 'WorkComp 360',
+          data: weeklyData.map(function(w) { return w.workcomp; }),
+          backgroundColor: '#10b981',
+          borderRadius: 4,
+        });
+      }
+      revenueChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: weeklyData.map(function(w) { return w.week; }), datasets: datasets },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            y: {
+              ticks: { callback: function(v) { return '$' + (v / 1000).toFixed(0) + 'k'; }, font: { size: 12 }, color: '#9ca3af' },
+              grid: { color: '#f0f0f0' }
+            },
+            x: { ticks: { font: { size: 12 }, color: '#9ca3af' }, grid: { display: false } }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                title: function(items) { return weeklyData[items[0].dataIndex].weekFull; },
+                label: function(item) { return item.dataset.label + ': ' + fmt(item.raw); }
+              }
+            },
+            legend: { position: 'top' }
+          }
+        }
+      });
+    }
+
+    function setView(view) {
+      ['both', 'precise', 'workcomp'].forEach(function(k) {
+        var btn = document.getElementById('btn-' + k);
+        if (k === view) {
+          btn.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-gray-900 text-white';
+        } else {
+          btn.className = 'px-4 py-2 rounded-lg text-sm font-medium bg-white text-gray-600 hover:bg-gray-100 border border-gray-200';
+        }
+      });
+      buildChart(view);
+    }
+
+    buildChart('both');
+  </script>
+</body>
+</html>
